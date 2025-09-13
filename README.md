@@ -1,3 +1,9 @@
+
+<p align="center">
+  <img src="assets/dameunbreak.png" alt="Banner" width="800"/>
+</p>
+
+
 # Ingeniera de software / DameUnBreak()
 
 Este repositorio tiene como propósito servir de espacio grupal para la clase de Ingeniería de Software. Aquí iremos subiendo y organizando las tareas, talleres, documentación y avances del proyecto principal, poniendo en práctica los conceptos y herramientas aprendidas durante el semestre.
