@@ -1,0 +1,34 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+
+jobs:
+  deps-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: |
+          python -m venv venv
+          . venv/bin/activate
+          pip install -r backend/requirements.txt
+
+      - name: Import smoke test
+        run: |
+          . venv/bin/activate
+          python - << 'PY'
+          import fastapi, sqlalchemy, pymysql, dotenv, email_validator
+          print("? Dependencias backend importadas OK")
+          PY
