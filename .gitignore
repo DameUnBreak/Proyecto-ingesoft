@@ -1,34 +1,15 @@
-# SO / cachés
-.DS_Store
-Thumbs.db
-
-# IDEs
-.vscode/
-.idea/
-*.code-workspace
-
-# Logs/temp
-*.log
-*.tmp
-
 # Python
+venv/
 __pycache__/
-.venv/
-*.py[cod]
+*.pyc
 
-# Node
-node_modules/
-dist/
-.build/
-.env
+# Entorno
+back/.env
+backend/.env
 
-# Java/Gradle
-target/
-build/
-*.class
-.gradle/
-.out/
-
-# Otros
-coverage/
-
+# Flutter/Android
+**/build/
+.dart_tool/
+.pub-cache/
+.packages
+android/local.properties
