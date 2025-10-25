@@ -8,6 +8,19 @@ from models import Usuario
 
 app = FastAPI(title="SmartCar API", version="1.0")
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI(title="SmartCar API", version="1.0")
+
+# CORS para Flutter Web (localhost)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # si quieres, luego restringe a http://localhost:* y http://127.0.0.1:*
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # ----------- Schemas (Pydantic) -----------
 class UsuarioCreate(BaseModel):
     nombre: str
