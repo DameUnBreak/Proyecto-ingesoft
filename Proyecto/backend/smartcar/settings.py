@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'smartcar_app',
+    'rest_framework',
+   
 ]
 
 MIDDLEWARE = [

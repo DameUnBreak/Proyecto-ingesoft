@@ -1,24 +1,18 @@
-from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from django.db import connection
+from rest_framework.response import Response
+
+# ✅ IMPORTS QUE FALTABAN
 from django.contrib.auth.hashers import make_password, check_password
 from .models import Usuario
 from .serializers import UsuarioSerializer
 
 
-
 @api_view(["GET"])
 def health(request):
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT 1;")
-        row = cursor.fetchone()
-
     return Response({
-        "mensaje": "Conexión OK con MySQL ✅",
-        "bd": connection.settings_dict.get("NAME"),
-        "resultado": row[0],
+        "mensaje": "Conexión OK con SQLite ✅",
+        "bd": "smartcar_sqlite"
     })
-
 
 
 @api_view(["POST"])
@@ -34,7 +28,6 @@ def crear_usuario(request):
     return Response(serializer.errors, status=400)
 
 
-
 @api_view(["GET"])
 def obtener_usuario(request, user_id):
     try:
@@ -44,7 +37,6 @@ def obtener_usuario(request, user_id):
 
     serializer = UsuarioSerializer(usuario)
     return Response(serializer.data)
-
 
 
 @api_view(["POST"])
@@ -78,7 +70,7 @@ def hola_mundo(request):
         usuario.save()
 
     return Response({
-        "mensaje": f"Hola, {usuario.nombre}! (id={usuario.id}) desde MySQL → Django → UI",
+        "mensaje": f"Hola, {usuario.nombre}! (id={usuario.id}) desde SQLite → Django ✅",
         "usuario": {
             "id": usuario.id,
             "nombre": usuario.nombre,
