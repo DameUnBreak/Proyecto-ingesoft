@@ -1,4 +1,4 @@
-# smartcar
+# frontend
 
 A new Flutter project.
 

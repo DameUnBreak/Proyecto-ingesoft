@@ -1,0 +1,129 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class ApiService {
+  static const String baseUrl = 'http://127.0.0.1:8000';
+
+
+  Future<bool> healthCheck() async {
+    final url = Uri.parse('$baseUrl/api/health/');
+    final response = await http.get(url);
+    return response.statusCode == 200;
+  }
+
+  Future<Map<String, dynamic>> registerUser(
+    String nombre,
+    String correo,
+    String contrasena,
+  ) async {
+    final url = Uri.parse('$baseUrl/api/usuarios/crear/');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'nombre': nombre,
+        'correo': correo,
+        'contrasena': contrasena,
+      }),
+    );
+
+    return {
+      'status': response.statusCode,
+      'body': jsonDecode(response.body),
+    };
+  }
+
+  Future<Map<String, dynamic>> login(
+    String correo,
+    String contrasena,
+  ) async {
+    final url = Uri.parse('$baseUrl/api/login/');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'correo': correo,
+        'contrasena': contrasena,
+      }),
+    );
+
+    return {
+      'status': response.statusCode,
+      'body': jsonDecode(response.body),
+    };
+  }
+
+  /// ✅ Obtener listas (soporta lista directa o objeto con "results"/"listas")
+  Future<List<dynamic>> getListas() async {
+    final url = Uri.parse('$baseUrl/api/listas/');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is List) {
+        // [ {...}, {...} ]
+        return decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        // { "results": [ ... ] } o { "listas": [ ... ] } o similar
+        final inner =
+            decoded['results'] ?? decoded['listas'] ?? decoded['data'];
+
+        if (inner is List) {
+          return inner;
+        } else {
+          throw Exception('Formato inesperado de listas en la respuesta');
+        }
+      } else {
+        throw Exception('Respuesta inesperada del servidor al obtener listas');
+      }
+    } else {
+      throw Exception('Error al obtener listas (${response.statusCode})');
+    }
+  }
+
+  /// ✅ Crear lista (nombre + presupuesto opcional)
+  Future<bool> crearLista(String nombre, double? presupuesto) async {
+    final url = Uri.parse('$baseUrl/api/listas/');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'nombre': nombre,
+        'presupuesto': presupuesto,
+      }),
+    );
+
+    return response.statusCode == 201;
+  }
+
+  /// ✅ Actualizar lista (editar nombre/presupuesto)
+  Future<bool> actualizarLista(
+    int id,
+    String nombre,
+    double? presupuesto,
+  ) async {
+    final url = Uri.parse('$baseUrl/api/listas/$id/');
+    final response = await http.put(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'nombre': nombre,
+        'presupuesto': presupuesto,
+      }),
+    );
+
+    // DRF suele devolver 200 o 202 al actualizar
+    return response.statusCode == 200 || response.statusCode == 202;
+  }
+
+  /// ✅ Eliminar lista
+  Future<bool> eliminarLista(int id) async {
+    // Asumo endpoint REST estándar de DRF: /api/listas/<id>/
+    final url = Uri.parse('$baseUrl/api/listas/$id/');
+    final response = await http.delete(url);
+
+    // DRF suele devolver 204, pero por si acaso aceptamos 200 también
+    return response.statusCode == 204 || response.statusCode == 200;
+  }
+}
