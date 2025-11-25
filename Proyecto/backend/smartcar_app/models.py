@@ -120,6 +120,8 @@ class Item(models.Model):
 
     def __str__(self):
         return f"{self.nombre} (lista_id={self.lista_id})"
+    def subtotal(self):
+        return self.cantidad * self.precio_unitario
 
 
 # ===========================

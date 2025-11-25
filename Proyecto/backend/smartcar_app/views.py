@@ -6,6 +6,7 @@ from .models import Usuario, Lista, Item
 from .serializers import UsuarioSerializer, ListaSerializer, ItemSerializer
 
 
+
 # ===========================
 # Helper: usuario demo
 # ===========================
@@ -218,3 +219,120 @@ def lista_detalle(request, lista_id):
     if request.method == "DELETE":
         lista.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+
+@api_view(["GET"])
+def resumen_lista(request, lista_id):
+    lista = Lista.objects.get(id=lista_id)
+    total = sum(item.subtotal() for item in lista.items.all())
+    data = {
+        "presupuesto": lista.presupuesto,
+        "total": total,
+        "supera_presupuesto": total > lista.presupuesto
+    }
+    return Response(data)
+
+
+
+@api_view(["GET"])
+def recomendaciones(request, lista_id):
+    lista = Lista.objects.get(id=lista_id)
+    items = lista.items.all()
+
+    recomendaciones = []
+
+    # 1. Si supera presupuesto
+    total = sum(i.subtotal() for i in items)
+    if total > lista.presupuesto:
+        recomendaciones.append("Has superado el presupuesto, considera reducir gastos.")
+
+    # 2. Categorías con más gasto
+    categorias = {}
+    for i in items:
+        categorias[i.categoria] = categorias.get(i.categoria, 0) + i.subtotal()
+    if categorias:
+        cat_mayor = max(categorias, key=categorias.get)
+        recomendaciones.append(f"Estás gastando mucho en '{cat_mayor}'.")
+
+    return Response(recomendaciones)
+
+
+
+# ===========================
+# ITEMS
+# ===========================
+
+
+
+" Funcion para actualizar el total de una lista"
+def recalcular_total(lista):
+    total = sum(item.subtotal() for item in lista.items.all())
+    lista.total = total
+    lista.save()
+
+
+
+@api_view(["GET", "POST"])
+def items(request):
+    
+    " GET <-- Para obtener los items de una lista"
+
+
+    if request.method == "GET":
+        lista_id = request.query_params.get("lista_id")
+        if lista_id:
+            qs = Item.objects.filter(lista_id=lista_id) 
+        else:
+            qs = Item.objects.all()
+        serializer = ItemSerializer(qs, many=True)
+        return Response({"items": serializer.data}, status=200)
+    
+
+    " POST <-- Para crear un item nuevo"
+
+    if request.method == "POST":
+        serializer = ItemSerializer(data=request.data)
+        if serializer.is_valid():
+            item = serializer.save()
+            recalcular_total(item.lista)
+            return Response(ItemSerializer(item).data, status=status.HTTP_201_CREATED)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["GET", "PUT", "DELETE"])
+def item_detalle(request, item_id):
+
+    try:
+        item = Item.objects.get(pk=item_id)
+    except Item.DoesNotExist:
+        return Response(
+            {"detail": "Item no encontrado"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+
+    "GET <-- Obtener informacion de un item"
+    if request.method == "GET":
+        serializer = ItemSerializer(item)
+        return Response(serializer.data, status=200)
+
+    "PUT <-- Editar informacion de un item"
+    if request.method == "PUT":
+        serializer = ItemSerializer(item, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            recalcular_total(item.lista)
+            return Response(serializer.data, status=200)
+        return Response(serializer.errors, status=400)
+
+    "DELETE <-- Eliminar un item "
+    if request.method == "DELETE":
+        item.delete()
+        recalcular_total(item.lista)
+        return Response({"message": "Item eliminado"}, status=200)
+
+
+        

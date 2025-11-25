@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'crear_lista_page.dart';
+import 'lista_detalle_page.dart';
+
+
+
 
 class MisListasPage extends StatefulWidget {
   const MisListasPage({super.key});
@@ -200,7 +204,15 @@ class _MisListasPageState extends State<MisListasPage> {
           subtitle: Text(subtitulo),
           onTap: () {
             if (id != null) {
-              _abrirEditarLista(lista);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ListaDetallePage(
+                    listaId: id,
+                    nombreLista: nombre,   
+                  ),
+                )
+              );
             }
           },
           trailing: id == null

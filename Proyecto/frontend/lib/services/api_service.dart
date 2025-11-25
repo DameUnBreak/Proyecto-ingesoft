@@ -126,4 +126,111 @@ class ApiService {
     // DRF suele devolver 204, pero por si acaso aceptamos 200 también
     return response.statusCode == 204 || response.statusCode == 200;
   }
+
+
+
+  Future<Map<String, dynamic>?> getResumenLista(int listaId) async {
+  final url = Uri.parse('$baseUrl/api/resumen_lista/$listaId/');
+  final response = await http.get(url);
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+  return null;
+  }
+
+
+  Future<List<String>> getRecomendaciones(int listaId) async {
+  final url = Uri.parse('$baseUrl/api/recomendaciones/$listaId/');
+
+  final response = await http.get(url);
+
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    return List<String>.from(data);
+  }
+
+  return [];
+  }
+
+
+  
+/// ITEMS
+
+
+
+  Future <bool> crearItem (int listaId, String nombre, String categoria, int cantidad, double precioUnitario, ) async {
+    final url = Uri.parse('$baseUrl/api/items/');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'lista' : listaId,
+        'nombre': nombre,
+        'categoria': categoria,
+        'cantidad': cantidad,
+        'precio_unitario': precioUnitario,
+      }),
+    );
+
+    return response.statusCode == 201;
+  }
+
+
+  Future<List<dynamic>> getItems(int listaId) async {
+    final url = Uri.parse('$baseUrl/api/items/?lista_id=$listaId');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    return data['items'];
+    } else {
+    return []; 
+    }
+  }
+
+
+
+
+  Future<Map<String, dynamic>?> getItemDetalle(int id) async {
+  final url = Uri.parse('$baseUrl/api/items/$id/');
+
+  final response = await http.get(url);
+
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  }
+  return null;
 }
+
+
+
+Future<bool> editarItem(int id, String nombre,String categoria, int cantidad, double precioUnitario ) async {
+  final url = Uri.parse('$baseUrl/api/items/$id/');
+
+  final response = await http.put(
+    url,
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "nombre": nombre,
+      'cantidad': cantidad,
+      'categoria': categoria,
+      'precio_unitario': precioUnitario,
+    }),
+  );
+
+  return response.statusCode == 200;
+}
+
+
+
+Future<bool> borrarItem(int id) async {
+  final url = Uri.parse('$baseUrl/api/items/$id/');
+
+  final response = await http.delete(url);
+
+  return response.statusCode == 200;
+}
+}
+
+
+
