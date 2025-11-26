@@ -65,6 +65,7 @@ class ListaSerializer(serializers.ModelSerializer):
 # ITEM
 # ===========================
 class ItemSerializer(serializers.ModelSerializer):
+    subtotal = serializers.SerializerMethodField()
     class Meta:
         model = Item
         fields = [
@@ -82,12 +83,19 @@ class ItemSerializer(serializers.ModelSerializer):
             "fecha_comprado",
             "cantidad_comprada",
             "precio_pagado",
+            "subtotal",
         ]
         read_only_fields = [
             "id",
             "fecha_agregado",
             "fecha_comprado",
+            "subtotal",
         ]
+    def get_subtotal(self, obj):
+        try:
+            return obj.cantidad * obj.precio_unitario
+        except:
+            return 0
 
 
 # ===========================
