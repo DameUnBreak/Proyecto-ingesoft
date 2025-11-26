@@ -222,12 +222,10 @@ def lista_detalle(request, lista_id):
 
 
 
-
-
 @api_view(["GET"])
 def resumen_lista(request, lista_id):
     lista = Lista.objects.get(id=lista_id)
-    total = sum(item.subtotal() for item in lista.items.all())
+    total = sum(item.cantidad * item.precio_unitario for item in lista.items.all())
     data = {
         "presupuesto": lista.presupuesto,
         "total": total,
@@ -236,27 +234,78 @@ def resumen_lista(request, lista_id):
     return Response(data)
 
 
-
 @api_view(["GET"])
 def recomendaciones(request, lista_id):
+
     lista = Lista.objects.get(id=lista_id)
     items = lista.items.all()
 
     recomendaciones = []
 
     # 1. Si supera presupuesto
-    total = sum(i.subtotal() for i in items)
+    total = sum(i.cantidad * i.precio_unitario for i in items)
     if total > lista.presupuesto:
         recomendaciones.append("Has superado el presupuesto, considera reducir gastos.")
 
     # 2. Categorías con más gasto
     categorias = {}
     for i in items:
-        categorias[i.categoria] = categorias.get(i.categoria, 0) + i.subtotal()
+        subtotal = i.cantidad * i.precio_unitario
+        categorias[i.categoria] = categorias.get(i.categoria, 0) + subtotal
     if categorias:
         cat_mayor = max(categorias, key=categorias.get)
         recomendaciones.append(f"Estás gastando mucho en '{cat_mayor}'.")
 
+
+    # 3. Cantidades demasiado grandes
+    for i in items:
+        if i.cantidad >= 10:
+            recomendaciones.append(
+                f"La cantidad del ítem '{i.nombre}' es bastante alta. Revisa si realmente necesitas tanto."
+            )
+            break
+    
+    # 4. Ítems de precio elevado
+    for i in items:
+        if i.precio_unitario > 30000:
+            recomendaciones.append(
+                f"El ítem '{i.nombre}' tiene un precio elevado. Considera buscar alternativas más económicas."
+            )
+            break
+        
+    # 5. Ítems duplicados
+    nombres = {}
+    for i in items:
+        nombres[i.nombre] = nombres.get(i.nombre, 0) + 1
+    
+    duplicados = [n for n, count in nombres.items() if count > 1]
+    if duplicados:
+        recomendaciones.append(
+            f"Tienes ítems duplicados en la lista: {', '.join(duplicados)}. "
+            "Elimina uno de ellos para evitar compras innecesarias."
+        )
+        
+    # 6. Lista con pocos ítems
+    if len(items) <= 2:
+        recomendaciones.append(
+            "Tu lista tiene pocos ítems. ¿Seguro que no olvidaste agregar algo importante?"
+        )
+ 
+    # 7) Valores mal formateados (cantidad o precio 0 o negativo)
+    for i in items:
+        if i.cantidad <= 0:
+            recomendaciones.append(
+                f"El ítem '{i.nombre or '(sin nombre)'}' tiene una cantidad inválida (debe ser mayor a 0)."
+            )
+            break
+
+        if i.precio_unitario < 0:
+            recomendaciones.append(
+                f"El ítem '{i.nombre or '(sin nombre)'}' tiene un precio negativo, revisa su valor."
+            )
+            break
+        
+    print("RECOMENDACIONES FINALES:", recomendaciones)
     return Response(recomendaciones)
 
 
@@ -266,11 +315,10 @@ def recomendaciones(request, lista_id):
 # ===========================
 
 
-
 " Funcion para actualizar el total de una lista"
 def recalcular_total(lista):
-    total = sum(item.subtotal() for item in lista.items.all())
-    lista.total = total
+    total = sum(item.cantidad * item.precio_unitario for item in lista.items.all())
+    lista.total_calculado = total
     lista.save()
 
 
