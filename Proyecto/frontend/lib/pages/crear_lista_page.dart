@@ -115,7 +115,7 @@ class _CrearListaPageState extends State<CrearListaPage> {
         title: Text(titulo),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
@@ -124,7 +124,7 @@ class _CrearListaPageState extends State<CrearListaPage> {
                 controller: _nombreController,
                 decoration: const InputDecoration(
                   labelText: 'Nombre de la lista',
-                  prefixIcon: Icon(Icons.title),
+                  border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -132,35 +132,28 @@ class _CrearListaPageState extends State<CrearListaPage> {
                   }
                   return null;
                 },
-                textCapitalization: TextCapitalization.sentences,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _presupuestoController,
                 decoration: const InputDecoration(
                   labelText: 'Presupuesto (opcional)',
                   hintText: 'Ej: 150000',
-                  prefixIcon: Icon(Icons.attach_money),
+                  border: OutlineInputBorder(),
                 ),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: _isLoading ? null : _guardar,
-                  icon: _isLoading
-                      ? const SizedBox.shrink()
-                      : const Icon(Icons.save),
-                  label: _isLoading
+                  child: _isLoading
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : Text(textoBoton),
                 ),
