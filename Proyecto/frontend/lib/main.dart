@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pages/login_page.dart';
 import 'theme_notifier.dart';
-import 'user_provider.dart';
 
 void main() {
   runApp(const SmartCarApp());
