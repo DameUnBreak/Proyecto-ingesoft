@@ -143,14 +143,18 @@ class _MisListasPageState extends State<MisListasPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(Icons.error_outline, size: 60, color: Colors.red),
+            const SizedBox(height: 16),
             Text(
               _error!,
               textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
             ),
-            const SizedBox(height: 8),
-            ElevatedButton(
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
               onPressed: _loadListas,
-              child: const Text('Reintentar'),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
             ),
           ],
         ),
@@ -158,16 +162,31 @@ class _MisListasPageState extends State<MisListasPage> {
     }
 
     if (_listas.isEmpty) {
-      return const Center(
-        child: Text('Aún no tienes listas.\nCrea una con el botón +'),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.playlist_add, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Aún no tienes listas',
+              style: TextStyle(fontSize: 20, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Crea una nueva con el botón +',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
       );
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.all(12),
       itemCount: _listas.length,
       itemBuilder: (context, index) {
         final dynamic raw = _listas[index];
-        // nos aseguramos de tratarlo como Map
         final Map<String, dynamic> lista =
             raw is Map<String, dynamic> ? raw : Map<String, dynamic>.from(raw);
 
@@ -188,48 +207,81 @@ class _MisListasPageState extends State<MisListasPage> {
             ? double.tryParse(lista['total_calculado'].toString())
             : null;
 
-        // 👇 Si el backend aún no calcula total, usamos presupuesto como "total visible"
         final double? totalMostrado = totalCalculado ?? presupuesto;
 
         String subtitulo;
         if (presupuesto == null && totalMostrado == null) {
-          subtitulo = 'Sin valores calculados';
+          subtitulo = 'Sin presupuesto';
         } else {
           subtitulo =
-              'Total: ${totalMostrado ?? 0}  |  Presupuesto: ${presupuesto ?? 0}';
+              'Total: \$${totalMostrado?.toStringAsFixed(2) ?? "0.00"}';
+          if (presupuesto != null) {
+            subtitulo += ' / \$${presupuesto.toStringAsFixed(2)}';
+          }
         }
 
-        return ListTile(
-          title: Text(nombre),
-          subtitle: Text(subtitulo),
-          onTap: () {
-            if (id != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ListaDetallePage(
-                    listaId: id,
-                    nombreLista: nombre,   
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              child: Icon(
+                Icons.shopping_cart_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            title: Text(
+              nombre,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(subtitulo),
+            ),
+            onTap: () {
+              if (id != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ListaDetallePage(
+                      listaId: id,
+                      nombreLista: nombre,
+                    ),
+                  )
+                );
+              }
+            },
+            trailing: id == null
+                ? null
+                : PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _abrirEditarLista(lista);
+                      } else if (value == 'delete') {
+                        _eliminarLista(id);
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: ListTile(
+                          leading: Icon(Icons.edit),
+                          title: Text('Editar'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: Icon(Icons.delete, color: Colors.red),
+                          title: Text('Eliminar', style: TextStyle(color: Colors.red)),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
                   ),
-                )
-              );
-            }
-          },
-          trailing: id == null
-              ? null
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: () => _abrirEditarLista(lista),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _eliminarLista(id),
-                    ),
-                  ],
-                ),
+          ),
         );
       },
     );
