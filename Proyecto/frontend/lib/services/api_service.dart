@@ -230,6 +230,18 @@ Future<bool> borrarItem(int id) async {
 
   return response.statusCode == 200;
 }
+
+  // Historial
+  Future<List<dynamic>> getHistorialResumen() async {
+    final url = Uri.parse('$baseUrl/api/historial/resumen/');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      return [];
+    }
+  }
 }
 
 

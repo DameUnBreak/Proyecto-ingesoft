@@ -369,8 +369,25 @@ def item_detalle(request, item_id):
 
     "PUT <-- Editar informacion de un item"
     if request.method == "PUT":
+        # Detectar si se está marcando como comprado
+        was_comprado = item.comprado
+        
         serializer = ItemSerializer(item, data=request.data, partial=True)
         if serializer.is_valid():
+            # Si se marca como comprado y no estaba comprado antes
+            if serializer.validated_data.get('comprado', False) and not was_comprado:
+                from django.utils import timezone
+                # Auto-establecer fecha_comprado si no viene en el request
+                if 'fecha_comprado' not in serializer.validated_data:
+                    serializer.validated_data['fecha_comprado'] = timezone.now()
+                
+                # Auto-establecer precio_pagado si no viene en el request
+                # Usamos precio_unitario * cantidad como fallback
+                if 'precio_pagado' not in serializer.validated_data:
+                    cantidad = serializer.validated_data.get('cantidad', item.cantidad)
+                    precio_unit = serializer.validated_data.get('precio_unitario', item.precio_unitario)
+                    serializer.validated_data['precio_pagado'] = cantidad * precio_unit
+            
             serializer.save()
             recalcular_total(item.lista)
             return Response(serializer.data, status=200)
@@ -384,3 +401,93 @@ def item_detalle(request, item_id):
 
 
         
+
+# ===========================
+# HISTORIAL
+# ===========================
+@api_view(["GET"])
+def historial_resumen(request):
+    """
+    Devuelve un resumen de gastos agrupado por mes y luego por categoría.
+    Usa la fecha de creación de la lista para agrupar por mes.
+    Incluye todos los items de todas las listas del usuario.
+    """
+    from django.db.models.functions import TruncMonth
+    from django.db.models import Sum, F
+    from decimal import Decimal
+
+    # Obtener el usuario
+    usuario_id = request.query_params.get("usuario_id")
+    if usuario_id:
+        listas = Lista.objects.filter(usuario_id=usuario_id)
+    else:
+        usuario = get_demo_user()
+        listas = Lista.objects.filter(usuario=usuario)
+
+    # Estructura para acumular datos
+    resumen = {}
+    
+    # Iterar sobre cada lista
+    for lista in listas:
+        # Obtener el mes de creación de la lista
+        mes_creacion = lista.fecha_creacion
+        mes_str = mes_creacion.strftime("%Y-%m")  # "2025-11"
+        
+        # Inicializar el mes si no existe
+        if mes_str not in resumen:
+            resumen[mes_str] = {
+                "mes": mes_str,
+                "total_mes": Decimal('0'),
+                "categorias": {}
+            }
+        
+        # Obtener todos los items de esta lista
+        items = lista.items.all()
+        
+        for item in items:
+            # Calcular el subtotal del item
+            subtotal = item.cantidad * item.precio_unitario
+            
+            # Categoría (usar "Sin Categoría" si no tiene)
+            categoria = item.categoria or "Sin Categoría"
+            
+            # Acumular en el total del mes
+            resumen[mes_str]["total_mes"] += subtotal
+            
+            # Acumular en la categoría
+            if categoria not in resumen[mes_str]["categorias"]:
+                resumen[mes_str]["categorias"][categoria] = Decimal('0')
+            resumen[mes_str]["categorias"][categoria] += subtotal
+    
+    # Convertir a lista ordenada
+    resultado_final = []
+    
+    # Ordenar por mes descendente (más reciente primero)
+    for mes_key in sorted(resumen.keys(), reverse=True):
+        obj = resumen[mes_key]
+        total_mes_float = float(obj["total_mes"])
+        
+        # Convertir dict de categorias a lista
+        cats_list = []
+        for cat_name, cat_total in obj["categorias"].items():
+            cat_total_float = float(cat_total)
+            
+            # Calcular porcentaje (evitar división por cero)
+            porcentaje = (cat_total_float / total_mes_float * 100) if total_mes_float > 0 else 0
+            
+            cats_list.append({
+                "nombre": cat_name,
+                "total": cat_total_float,
+                "porcentaje": round(porcentaje, 1)  # Redondear a 1 decimal
+            })
+        
+        # Ordenar categorias por mayor gasto
+        cats_list.sort(key=lambda x: x["total"], reverse=True)
+        
+        resultado_final.append({
+            "mes": mes_key,
+            "total_mes": total_mes_float,
+            "categorias": cats_list
+        })
+    
+    return Response(resultado_final, status=200)
