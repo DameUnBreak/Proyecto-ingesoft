@@ -9,8 +9,9 @@ import '../user_provider.dart';
 
 class HomePage extends StatelessWidget {
   final String correo;
+  final int userId;
 
-  const HomePage({super.key, required this.correo});
+  const HomePage({super.key, required this.correo, required this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -24,13 +25,14 @@ class HomePage extends StatelessWidget {
               return IconButton(
                 icon: Icon(
                   currentMode == ThemeMode.dark
-                      ? Icons.light_mode
-                      : Icons.dark_mode,
+                      ? Icons.dark_mode
+                      : Icons.light_mode,
                 ),
                 onPressed: () {
-                  themeNotifier.value = currentMode == ThemeMode.dark
-                      ? ThemeMode.light
-                      : ThemeMode.dark;
+                  themeNotifier.value =
+                      currentMode == ThemeMode.dark
+                          ? ThemeMode.light
+                          : ThemeMode.dark;
                 },
               );
             },
@@ -39,32 +41,44 @@ class HomePage extends StatelessWidget {
       ),
       drawer: Drawer(
         child: ListView(
-          padding: EdgeInsets.zero,
           children: [
-            UserAccountsDrawerHeader(
-              accountName: ValueListenableBuilder<String?>(
-                valueListenable: userNotifier,
-                builder: (context, nombre, child) {
-                  return Text(nombre ?? 'Usuario');
-                },
-              ),
-              accountEmail: Text(correo),
-              currentAccountPicture: const CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Icon(Icons.person, size: 40, color: Color(0xFF1565C0)),
-              ),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1565C0),
+            DrawerHeader(
+              decoration:
+                  BoxDecoration(color: Theme.of(context).primaryColor),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircleAvatar(
+                    radius: 32,
+                    child: Icon(Icons.person, size: 40),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    correo,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.list_alt),
+              leading: const Icon(Icons.home),
+              title: const Text('Inicio'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.list),
               title: const Text('Mis Listas'),
               onTap: () {
-                Navigator.pop(context); // Close drawer
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const MisListasPage()),
+                  MaterialPageRoute(
+                    builder: (_) => MisListasPage(usuarioId: userId),
+                  ),
                 );
               },
             ),
@@ -72,7 +86,6 @@ class HomePage extends StatelessWidget {
               leading: const Icon(Icons.settings),
               title: const Text('Configuración'),
               onTap: () {
-                Navigator.pop(context);
                 // TODO: Implement settings
               },
             ),
@@ -95,63 +108,16 @@ class HomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Improved Greeting Section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.secondary,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+            Text(
+              'Hola, $correo',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '¡Hola de nuevo!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.account_circle, color: Colors.white70),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ValueListenableBuilder<String?>(
-                          valueListenable: userNotifier,
-                          builder: (context, nombre, child) {
-                            return Text(
-                              nombre ?? correo,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Administra tus listas de compras y mantén tu presupuesto bajo control.',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 24),
             Expanded(
@@ -169,7 +135,8 @@ class HomePage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const MisListasPage(),
+                          builder: (_) =>
+                              MisListasPage(usuarioId: userId),
                         ),
                       );
                     },
@@ -183,7 +150,8 @@ class HomePage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const CrearListaPage(),
+                          builder: (_) =>
+                              CrearListaPage(usuarioId: userId),
                         ),
                       );
                     },
@@ -221,109 +189,51 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class _DashboardCard extends StatefulWidget {
+class _DashboardCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final Color color;
-  final VoidCallback onTap;
   final int delay;
+  final VoidCallback onTap;
 
   const _DashboardCard({
     required this.icon,
     required this.title,
     required this.color,
+    required this.delay,
     required this.onTap,
-    this.delay = 0,
   });
 
   @override
-  State<_DashboardCard> createState() => _DashboardCardState();
-}
-
-class _DashboardCardState extends State<_DashboardCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  bool _isHovered = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-    _scaleAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutBack,
-    );
-
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          transform: Matrix4.identity()..translate(0.0, _isHovered ? -10.0 : 0.0),
-          child: Card(
-            elevation: _isHovered ? 12 : 8,
-            shadowColor: widget.color.withOpacity(0.4),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            child: InkWell(
-              onTap: widget.onTap,
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Theme.of(context).cardColor,
-                      Theme.of(context).cardColor.withOpacity(0.9),
-                    ],
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300 + delay),
+      curve: Curves.easeOut,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.4)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 40, color: color),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: widget.color.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        widget.icon,
-                        size: 48, // Larger icon
-                        color: widget.color,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ),
           ),
         ),

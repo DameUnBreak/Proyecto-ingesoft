@@ -6,14 +6,14 @@ from .models import Usuario, Lista, Item
 from .serializers import UsuarioSerializer, ListaSerializer, ItemSerializer
 
 
-
 # ===========================
-# Helper: usuario demo
+# Helper: usuario demo (solo para pruebas)
 # ===========================
 def get_demo_user():
     """
     Mientras no tenemos autenticación real integrada con Flutter,
-    si no nos mandan usuario usamos siempre un usuario 'demo'.
+    se puede usar en pruebas, pero YA NO se usa por defecto en los endpoints
+    de listas, para evitar que todos vean las mismas listas.
     """
     usuario = Usuario.objects.first()
     if not usuario:
@@ -144,38 +144,57 @@ def listas(request):
     GET /api/listas/?usuario_id=1   -> devuelve listas del usuario
     POST /api/listas/              -> crea una lista nueva
 
-    Body POST que espera Flutter ahora mismo:
+    Body POST esperado desde Flutter ahora:
     {
         "nombre": "Lista mercado",
-    OPTIONAL "presupuesto": 150000
+        "presupuesto": 150000,   (opcional)
+        "usuario_id": 3          (obligatorio ahora para multiusuario)
     }
-    (sin campo 'usuario'; lo completamos aquí)
+
+    También aceptamos "usuario" en lugar de "usuario_id".
     """
 
     # ---------- GET ----------
     if request.method == "GET":
         usuario_id = request.query_params.get("usuario_id")
 
-        if usuario_id:
-            qs = Lista.objects.filter(usuario_id=usuario_id)
-        else:
-            # si no nos mandan usuario_id, usamos el usuario demo
-            usuario = get_demo_user()
-            qs = Lista.objects.filter(usuario=usuario)
+        if not usuario_id:
+            return Response(
+                {"detail": "Parametro 'usuario_id' es requerido en la URL."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        qs = Lista.objects.filter(usuario_id=usuario_id).order_by("-fecha_creacion")
         serializer = ListaSerializer(qs, many=True)
         # Para que cuadre con ApiService: envolvemos en {"listas": [...]}
         return Response({"listas": serializer.data}, status=status.HTTP_200_OK)
 
     # ---------- POST ----------
-    # Aquí adaptamos para que, si Flutter NO manda 'usuario',
-    # usemos el usuario demo automáticamente.
-    data = dict(request.data)
+    # Aquí YA NO usamos get_demo_user por defecto;
+    # exigimos que nos digan para qué usuario es la lista.
+    data = request.data.copy()
 
-    usuario_id = data.get("usuario")
+    # Aceptamos tanto "usuario" como "usuario_id" desde el frontend
+    usuario_id = data.get("usuario") or data.get("usuario_id")
+
     if not usuario_id:
-        usuario = get_demo_user()
-        data["usuario"] = usuario.id
+        return Response(
+            {
+                "detail": "Debes enviar 'usuario_id' (o 'usuario') en el body para crear una lista."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        usuario = Usuario.objects.get(pk=usuario_id)
+    except Usuario.DoesNotExist:
+        return Response(
+            {"detail": f"Usuario con id={usuario_id} no existe."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # El serializer espera el campo 'usuario' (FK)
+    data["usuario"] = usuario.id
 
     serializer = ListaSerializer(data=data)
     if serializer.is_valid():
@@ -207,7 +226,13 @@ def lista_detalle(request, lista_id):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     if request.method == "PUT":
-        serializer = ListaSerializer(lista, data=request.data, partial=True)
+        data = request.data.copy()
+
+        # Si quisieran cambiar el usuario de la lista, controlamos igual:
+        if "usuario_id" in data and "usuario" not in data:
+            data["usuario"] = data["usuario_id"]
+
+        serializer = ListaSerializer(lista, data=data, partial=True)
         if serializer.is_valid():
             lista = serializer.save()
             return Response(
@@ -221,25 +246,36 @@ def lista_detalle(request, lista_id):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-
 @api_view(["GET"])
 def resumen_lista(request, lista_id):
-    lista = Lista.objects.get(id=lista_id)
+    try:
+        lista = Lista.objects.get(id=lista_id)
+    except Lista.DoesNotExist:
+        return Response(
+            {"detail": "Lista no encontrada"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
     total = sum(item.cantidad * item.precio_unitario for item in lista.items.all())
     data = {
         "presupuesto": lista.presupuesto,
         "total": total,
-        "supera_presupuesto": total > lista.presupuesto
+        "supera_presupuesto": total > lista.presupuesto,
     }
     return Response(data)
 
 
 @api_view(["GET"])
 def recomendaciones(request, lista_id):
+    try:
+        lista = Lista.objects.get(id=lista_id)
+    except Lista.DoesNotExist:
+        return Response(
+            {"detail": "Lista no encontrada"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
-    lista = Lista.objects.get(id=lista_id)
     items = lista.items.all()
-
     recomendaciones = []
 
     # 1. Si supera presupuesto
@@ -251,11 +287,11 @@ def recomendaciones(request, lista_id):
     categorias = {}
     for i in items:
         subtotal = i.cantidad * i.precio_unitario
-        categorias[i.categoria] = categorias.get(i.categoria, 0) + subtotal
+        if i.categoria:
+            categorias[i.categoria] = categorias.get(i.categoria, 0) + subtotal
     if categorias:
         cat_mayor = max(categorias, key=categorias.get)
         recomendaciones.append(f"Estás gastando mucho en '{cat_mayor}'.")
-
 
     # 3. Cantidades demasiado grandes
     for i in items:
@@ -264,7 +300,7 @@ def recomendaciones(request, lista_id):
                 f"La cantidad del ítem '{i.nombre}' es bastante alta. Revisa si realmente necesitas tanto."
             )
             break
-    
+
     # 4. Ítems de precio elevado
     for i in items:
         if i.precio_unitario > 30000:
@@ -272,26 +308,26 @@ def recomendaciones(request, lista_id):
                 f"El ítem '{i.nombre}' tiene un precio elevado. Considera buscar alternativas más económicas."
             )
             break
-        
+
     # 5. Ítems duplicados
     nombres = {}
     for i in items:
         nombres[i.nombre] = nombres.get(i.nombre, 0) + 1
-    
+
     duplicados = [n for n, count in nombres.items() if count > 1]
     if duplicados:
         recomendaciones.append(
             f"Tienes ítems duplicados en la lista: {', '.join(duplicados)}. "
             "Elimina uno de ellos para evitar compras innecesarias."
         )
-        
+
     # 6. Lista con pocos ítems
     if len(items) <= 2:
         recomendaciones.append(
             "Tu lista tiene pocos ítems. ¿Seguro que no olvidaste agregar algo importante?"
         )
- 
-    # 7) Valores mal formateados (cantidad o precio 0 o negativo)
+
+    # 7. Valores mal formateados (cantidad o precio 0 o negativo)
     for i in items:
         if i.cantidad <= 0:
             recomendaciones.append(
@@ -304,55 +340,68 @@ def recomendaciones(request, lista_id):
                 f"El ítem '{i.nombre or '(sin nombre)'}' tiene un precio negativo, revisa su valor."
             )
             break
-        
+
     print("RECOMENDACIONES FINALES:", recomendaciones)
     return Response(recomendaciones)
-
 
 
 # ===========================
 # ITEMS
 # ===========================
 
-
-" Funcion para actualizar el total de una lista"
+# Función para actualizar el total de una lista
 def recalcular_total(lista):
     total = sum(item.cantidad * item.precio_unitario for item in lista.items.all())
     lista.total_calculado = total
     lista.save()
 
 
-
 @api_view(["GET", "POST"])
 def items(request):
-    
-    " GET <-- Para obtener los items de una lista"
+    """
+    GET  /api/items/?lista_id=10  -> items de una lista
+    POST /api/items/              -> crea un item nuevo
+    """
 
-
+    # ---------- GET ----------
     if request.method == "GET":
         lista_id = request.query_params.get("lista_id")
-        if lista_id:
-            qs = Item.objects.filter(lista_id=lista_id) 
-        else:
-            qs = Item.objects.all()
+        if not lista_id:
+            return Response(
+                {"detail": "Parametro 'lista_id' es requerido para listar items."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = Item.objects.filter(lista_id=lista_id)
         serializer = ItemSerializer(qs, many=True)
-        return Response({"items": serializer.data}, status=200)
-    
+        return Response({"items": serializer.data}, status=status.HTTP_200_OK)
 
-    " POST <-- Para crear un item nuevo"
-
+    # ---------- POST ----------
     if request.method == "POST":
-        serializer = ItemSerializer(data=request.data)
+        data = request.data.copy()
+
+        # Aceptamos tanto 'lista' como 'lista_id'
+        lista_id = data.get("lista") or data.get("lista_id")
+        if not lista_id:
+            return Response(
+                {"detail": "Debes enviar 'lista_id' (o 'lista') en el body para crear un item."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data["lista"] = lista_id
+
+        serializer = ItemSerializer(data=data)
         if serializer.is_valid():
             item = serializer.save()
             recalcular_total(item.lista)
-            return Response(ItemSerializer(item).data, status=status.HTTP_201_CREATED)
+            return Response(
+                ItemSerializer(item).data,
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["GET", "PUT", "DELETE"])
 def item_detalle(request, item_id):
-
     try:
         item = Item.objects.get(pk=item_id)
     except Item.DoesNotExist:
@@ -361,26 +410,28 @@ def item_detalle(request, item_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-
-    "GET <-- Obtener informacion de un item"
+    # GET <-- Obtener informacion de un item
     if request.method == "GET":
         serializer = ItemSerializer(item)
-        return Response(serializer.data, status=200)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    "PUT <-- Editar informacion de un item"
+    # PUT <-- Editar informacion de un item
     if request.method == "PUT":
-        serializer = ItemSerializer(item, data=request.data, partial=True)
+        data = request.data.copy()
+        # Igual que antes, aceptamos 'lista_id'
+        if "lista_id" in data and "lista" not in data:
+            data["lista"] = data["lista_id"]
+
+        serializer = ItemSerializer(item, data=data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            item = serializer.save()
             recalcular_total(item.lista)
-            return Response(serializer.data, status=200)
-        return Response(serializer.errors, status=400)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    "DELETE <-- Eliminar un item "
+    # DELETE <-- Eliminar un item
     if request.method == "DELETE":
+        lista = item.lista
         item.delete()
-        recalcular_total(item.lista)
-        return Response({"message": "Item eliminado"}, status=200)
-
-
-        
+        recalcular_total(lista)
+        return Response({"message": "Item eliminado"}, status=status.HTTP_200_OK)

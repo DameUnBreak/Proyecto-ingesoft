@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import 'crear_lista_page.dart';
 import 'lista_detalle_page.dart';
 
-
-
-
 class MisListasPage extends StatefulWidget {
-  const MisListasPage({super.key});
+  final int usuarioId;
+
+  const MisListasPage({super.key, required this.usuarioId});
 
   @override
   State<MisListasPage> createState() => _MisListasPageState();
@@ -19,6 +19,15 @@ class _MisListasPageState extends State<MisListasPage> {
   List<dynamic> _listas = [];
   bool _cargando = false;
   String? _error;
+
+  final NumberFormat _copFormat =
+      NumberFormat.currency(locale: 'es_CO', symbol: '\$');
+
+  String _formatCurrency(dynamic value) {
+    if (value == null) return '-';
+    final numValue = double.tryParse(value.toString()) ?? 0;
+    return _copFormat.format(numValue);
+  }
 
   @override
   void initState() {
@@ -33,7 +42,7 @@ class _MisListasPageState extends State<MisListasPage> {
     });
 
     try {
-      final data = await api.getListas();
+      final data = await api.getListas(widget.usuarioId);
       // ignore: avoid_print
       print('DEBUG listas: $data');
 
@@ -55,7 +64,7 @@ class _MisListasPageState extends State<MisListasPage> {
     final creado = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const CrearListaPage(),
+        builder: (_) => CrearListaPage(usuarioId: widget.usuarioId),
       ),
     );
 
@@ -68,7 +77,8 @@ class _MisListasPageState extends State<MisListasPage> {
     final editado = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CrearListaPage(listaInicial: lista),
+        builder: (_) =>
+            CrearListaPage(listaInicial: lista, usuarioId: widget.usuarioId),
       ),
     );
 
@@ -90,7 +100,7 @@ class _MisListasPageState extends State<MisListasPage> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancelar'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Eliminar'),
           ),
@@ -119,6 +129,25 @@ class _MisListasPageState extends State<MisListasPage> {
     }
   }
 
+  void _abrirDetalleLista(Map<String, dynamic> lista) {
+    final id = lista['id'] as int?;
+    final nombre = (lista['nombre'] ?? '').toString();
+
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: ID de lista inválido')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ListaDetallePage(listaId: id, nombreLista: nombre),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,150 +169,70 @@ class _MisListasPageState extends State<MisListasPage> {
 
     if (_error != null) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 60, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _loadListas,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar'),
-            ),
-          ],
+        child: Text(
+          _error!,
+          style: const TextStyle(color: Colors.red),
         ),
       );
     }
 
     if (_listas.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.playlist_add, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Aún no tienes listas',
-              style: TextStyle(fontSize: 20, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Crea una nueva con el botón +',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
+      return const Center(
+        child: Text('Aún no tienes listas creadas.'),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: _listas.length,
-      itemBuilder: (context, index) {
-        final dynamic raw = _listas[index];
-        final Map<String, dynamic> lista =
-            raw is Map<String, dynamic> ? raw : Map<String, dynamic>.from(raw);
+    return RefreshIndicator(
+      onRefresh: _loadListas,
+      child: ListView.builder(
+        itemCount: _listas.length,
+        itemBuilder: (context, index) {
+          final lista = _listas[index] as Map<String, dynamic>;
+          final nombre = (lista['nombre'] ?? '').toString();
+          final presupuesto = lista['presupuesto'];
+          final totalCalculado = lista['total_calculado'];
 
-        final String nombre = (lista['nombre'] ?? 'Sin nombre').toString();
-
-        final int? id = () {
-          final rawId = lista['id'];
-          if (rawId == null) return null;
-          if (rawId is int) return rawId;
-          return int.tryParse(rawId.toString());
-        }();
-
-        final double? presupuesto = lista['presupuesto'] != null
-            ? double.tryParse(lista['presupuesto'].toString())
-            : null;
-
-        final double? totalCalculado = lista['total_calculado'] != null
-            ? double.tryParse(lista['total_calculado'].toString())
-            : null;
-
-        final double? totalMostrado = totalCalculado ?? presupuesto;
-
-        String subtitulo;
-        if (presupuesto == null && totalMostrado == null) {
-          subtitulo = 'Sin presupuesto';
-        } else {
-          subtitulo =
-              'Total: \$${totalMostrado?.toStringAsFixed(2) ?? "0.00"}';
-          if (presupuesto != null) {
-            subtitulo += ' / \$${presupuesto.toStringAsFixed(2)}';
-          }
-        }
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: Icon(
-                Icons.shopping_cart_outlined,
-                color: Theme.of(context).colorScheme.primary,
+          return Card(
+            margin:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: ListTile(
+              title: Text(nombre),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (presupuesto != null)
+                    Text('Presupuesto: ${_formatCurrency(presupuesto)}'),
+                  if (totalCalculado != null)
+                    Text('Total: ${_formatCurrency(totalCalculado)}'),
+                ],
+              ),
+              onTap: () => _abrirDetalleLista(lista),
+              trailing: PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'editar') {
+                    _abrirEditarLista(lista);
+                  } else if (value == 'eliminar') {
+                    final id = lista['id'] as int?;
+                    if (id != null) {
+                      _eliminarLista(id);
+                    }
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'editar',
+                    child: Text('Editar'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'eliminar',
+                    child: Text('Eliminar'),
+                  ),
+                ],
               ),
             ),
-            title: Text(
-              nombre,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(subtitulo),
-            ),
-            onTap: () {
-              if (id != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ListaDetallePage(
-                      listaId: id,
-                      nombreLista: nombre,
-                    ),
-                  )
-                );
-              }
-            },
-            trailing: id == null
-                ? null
-                : PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        _abrirEditarLista(lista);
-                      } else if (value == 'delete') {
-                        _eliminarLista(id);
-                      }
-                    },
-                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                      const PopupMenuItem<String>(
-                        value: 'edit',
-                        child: ListTile(
-                          leading: Icon(Icons.edit),
-                          title: Text('Editar'),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'delete',
-                        child: ListTile(
-                          leading: Icon(Icons.delete, color: Colors.red),
-                          title: Text('Eliminar', style: TextStyle(color: Colors.red)),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

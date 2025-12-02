@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 class ApiService {
   static const String baseUrl = 'http://127.0.0.1:8000';
 
-
   Future<bool> healthCheck() async {
     final url = Uri.parse('$baseUrl/api/health/');
     final response = await http.get(url);
@@ -53,9 +52,9 @@ class ApiService {
     };
   }
 
-  /// ✅ Obtener listas (soporta lista directa o objeto con "results"/"listas")
-  Future<List<dynamic>> getListas() async {
-    final url = Uri.parse('$baseUrl/api/listas/');
+  /// ✅ Obtener listas de un usuario (soporta lista directa o objeto con "results"/"listas")
+  Future<List<dynamic>> getListas(int usuarioId) async {
+    final url = Uri.parse('$baseUrl/api/listas/?usuario_id=$usuarioId');
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
@@ -82,8 +81,8 @@ class ApiService {
     }
   }
 
-  /// ✅ Crear lista (nombre + presupuesto opcional)
-  Future<bool> crearLista(String nombre, double? presupuesto) async {
+  /// ✅ Crear lista (nombre + presupuesto opcional) para un usuario
+  Future<bool> crearLista(String nombre, double? presupuesto, int usuarioId) async {
     final url = Uri.parse('$baseUrl/api/listas/');
     final response = await http.post(
       url,
@@ -91,6 +90,7 @@ class ApiService {
       body: jsonEncode({
         'nombre': nombre,
         'presupuesto': presupuesto,
+        'usuario_id': usuarioId,
       }),
     );
 
@@ -127,110 +127,111 @@ class ApiService {
     return response.statusCode == 204 || response.statusCode == 200;
   }
 
-
-
   Future<Map<String, dynamic>?> getResumenLista(int listaId) async {
-  final url = Uri.parse('$baseUrl/api/resumen_lista/$listaId/');
-  final response = await http.get(url);
-  if (response.statusCode == 200) {
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    final url = Uri.parse('$baseUrl/api/resumen_lista/$listaId/');
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    return null;
   }
-  return null;
-  }
-
 
   Future<List<String>> getRecomendaciones(int listaId) async {
-  final url = Uri.parse('$baseUrl/api/recomendaciones/$listaId/');
+    final url = Uri.parse('$baseUrl/api/recomendaciones/$listaId/');
 
-  final response = await http.get(url);
+    final response = await http.get(url);
 
-  if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);
-    return List<String>.from(data);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return List<String>.from(data);
+    }
+
+    return [];
   }
 
-  return [];
-  }
+  /// ITEMS
 
-
-  
-/// ITEMS
-
-
-
-  Future <bool> crearItem (int listaId, String nombre, String categoria, int cantidad, double precioUnitario, ) async {
+  Future<bool> crearItem(
+    int listaId,
+    String nombre,
+    int cantidad,
+    String categoria,
+    double precioUnitario,
+  ) async {
     final url = Uri.parse('$baseUrl/api/items/');
+
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: {"Content-Type": "application/json"},
       body: jsonEncode({
-        'lista' : listaId,
-        'nombre': nombre,
-        'categoria': categoria,
-        'cantidad': cantidad,
-        'precio_unitario': precioUnitario,
+        "lista_id": listaId,
+        "nombre": nombre,
+        "cantidad": cantidad,
+        "categoria": categoria,
+        "precio_unitario": precioUnitario,
       }),
     );
 
     return response.statusCode == 201;
   }
 
-
   Future<List<dynamic>> getItems(int listaId) async {
     final url = Uri.parse('$baseUrl/api/items/?lista_id=$listaId');
+
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);
-    return data['items'];
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic> && data.containsKey('items')) {
+        return data['items'];
+      } else {
+        return [];
+      }
     } else {
-    return []; 
+      return [];
     }
   }
 
-
-
-
   Future<Map<String, dynamic>?> getItemDetalle(int id) async {
-  final url = Uri.parse('$baseUrl/api/items/$id/');
+    final url = Uri.parse('$baseUrl/api/items/$id/');
 
-  final response = await http.get(url);
+    final response = await http.get(url);
 
-  if (response.statusCode == 200) {
-    return jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    return null;
   }
-  return null;
+
+  Future<bool> editarItem(
+    int id,
+    String nombre,
+    String categoria,
+    int cantidad,
+    double precioUnitario,
+  ) async {
+    final url = Uri.parse('$baseUrl/api/items/$id/');
+
+    final response = await http.put(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "nombre": nombre,
+        'cantidad': cantidad,
+        'categoria': categoria,
+        'precio_unitario': precioUnitario,
+      }),
+    );
+
+    return response.statusCode == 200;
+  }
+
+  Future<bool> borrarItem(int id) async {
+    final url = Uri.parse('$baseUrl/api/items/$id/');
+
+    final response = await http.delete(url);
+
+    return response.statusCode == 200;
+  }
 }
-
-
-
-Future<bool> editarItem(int id, String nombre,String categoria, int cantidad, double precioUnitario ) async {
-  final url = Uri.parse('$baseUrl/api/items/$id/');
-
-  final response = await http.put(
-    url,
-    headers: {"Content-Type": "application/json"},
-    body: jsonEncode({
-      "nombre": nombre,
-      'cantidad': cantidad,
-      'categoria': categoria,
-      'precio_unitario': precioUnitario,
-    }),
-  );
-
-  return response.statusCode == 200;
-}
-
-
-
-Future<bool> borrarItem(int id) async {
-  final url = Uri.parse('$baseUrl/api/items/$id/');
-
-  final response = await http.delete(url);
-
-  return response.statusCode == 200;
-}
-}
-
-
-
