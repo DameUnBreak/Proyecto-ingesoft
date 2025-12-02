@@ -148,6 +148,15 @@ class ApiService {
 
     return [];
   }
+  Future<Map<String, dynamic>> obtenerHistorial(int usuarioId) async {
+    final url = Uri.parse('$baseUrl/api/historial/$usuarioId/');
+    final response = await http.get(url);
+    return {
+      "status": response.statusCode,
+      "body": jsonDecode(response.body),
+    };
+  }
+
 
   /// ITEMS
 

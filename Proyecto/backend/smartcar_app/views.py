@@ -2,8 +2,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Usuario, Lista, Item
-from .serializers import UsuarioSerializer, ListaSerializer, ItemSerializer
+from .models import Usuario, Lista, Item, Historial
+from .serializers import UsuarioSerializer, ListaSerializer, ItemSerializer, HistorialSerializer
 
 
 # ===========================
@@ -135,6 +135,67 @@ def login(request):
     return Response(data, status=status.HTTP_200_OK)
 
 
+@api_view(["POST"])
+def guardar_historial(request):
+    """
+    Crea un registro de historial.
+
+    POST /api/historial/
+
+    Body JSON esperado:
+    {
+        "usuario_id": 3,
+        "mes": "2025-10",
+        "total": 250000,
+        "numero_items": 12,
+        "promedio_por_categoria": 35000
+    }
+    """
+
+    data = request.data.copy()
+
+    # Aceptamos tanto "usuario" como "usuario_id"
+    usuario_id = data.get("usuario") or data.get("usuario_id")
+
+    if not usuario_id:
+        return Response(
+            {"detail": "Debes enviar 'usuario_id' (o 'usuario') en el body."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        usuario = Usuario.objects.get(pk=usuario_id)
+    except Usuario.DoesNotExist:
+        return Response(
+            {"detail": f"Usuario con id={usuario_id} no existe."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Lo que espera el serializer
+    data["usuario"] = usuario.id
+
+    serializer = HistorialSerializer(data=data)
+    if serializer.is_valid():
+        registro = serializer.save()
+        return Response(
+            HistorialSerializer(registro).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["GET"])
+def historial_usuario(request, usuario_id):
+    """
+    GET /api/historial/3/
+    Devuelve historial completo del usuario con id=3
+    """
+    qs = Historial.objects.filter(usuario_id=usuario_id).order_by("-fecha_registro")
+    serializer = HistorialSerializer(qs, many=True)
+    return Response({"historial": serializer.data}, status=status.HTTP_200_OK)
+
+
+
 # ===========================
 # LISTAS
 # ===========================
@@ -199,6 +260,13 @@ def listas(request):
     serializer = ListaSerializer(data=data)
     if serializer.is_valid():
         lista = serializer.save()
+        Historial.objects.create(
+            usuario=usuario,
+            mes=lista.fecha_creacion.strftime("%Y-%m"),
+            total=lista.presupuesto or 0,
+            numero_items=lista.items.count(),
+            promedio_por_categoria=0  # o algún cálculo si quieres
+        )
         return Response(
             ListaSerializer(lista).data,
             status=status.HTTP_201_CREATED,
@@ -354,6 +422,14 @@ def recalcular_total(lista):
     total = sum(item.cantidad * item.precio_unitario for item in lista.items.all())
     lista.total_calculado = total
     lista.save()
+    usuario = lista.usuario
+    mes = lista.fecha_creacion.strftime("%Y-%m")
+    historial, created = Historial.objects.get_or_create(usuario=usuario, mes=mes)
+    historial.total = total
+    historial.numero_items = lista.items.count()
+    # promedio_por_categoria: calcula si quieres
+    historial.save()
+
 
 
 @api_view(["GET", "POST"])

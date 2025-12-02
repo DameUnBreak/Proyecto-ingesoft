@@ -26,4 +26,9 @@ urlpatterns = [
     #Recomendaciones
     path("recomendaciones/<int:lista_id>/", views.recomendaciones, name="recomendaciones"),
 
+    # 🧾 Historial - crear registro
+    path("historial/", views.guardar_historial, name="guardar_historial"),
+    # 🧾 Historial - obtener historial de un usuario
+    path("historial/<int:usuario_id>/", views.historial_usuario, name="historial_usuario"),
+
 ]

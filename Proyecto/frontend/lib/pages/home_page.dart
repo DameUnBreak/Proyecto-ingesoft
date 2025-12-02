@@ -3,8 +3,8 @@ import 'mis_listas_page.dart';
 import 'crear_lista_page.dart';
 import 'login_page.dart';
 import 'perfil_page.dart';
+import 'historial_page.dart';
 import '../theme_notifier.dart';
-
 import '../user_provider.dart';
 
 class HomePage extends StatelessWidget {
@@ -162,6 +162,12 @@ class HomePage extends StatelessWidget {
                     color: Colors.orangeAccent,
                     delay: 200,
                     onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:(_) => HistorialPage(usuarioId: userId),
+                        ),
+                      );
                       // Placeholder
                     },
                   ),
