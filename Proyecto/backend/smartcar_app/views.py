@@ -134,7 +134,6 @@ def login(request):
     }
     return Response(data, status=status.HTTP_200_OK)
 
-
 @api_view(["POST"])
 def guardar_historial(request):
     """
@@ -193,6 +192,8 @@ def historial_usuario(request, usuario_id):
     qs = Historial.objects.filter(usuario_id=usuario_id).order_by("-fecha_registro")
     serializer = HistorialSerializer(qs, many=True)
     return Response({"historial": serializer.data}, status=status.HTTP_200_OK)
+
+
 
 
 
@@ -260,12 +261,14 @@ def listas(request):
     serializer = ListaSerializer(data=data)
     if serializer.is_valid():
         lista = serializer.save()
+        usuario = lista.usuario
+        mes = lista.fecha_creacion.strftime("%Y-%m")
+  # 1. Crea un NUEVO registro de Historial para esta lista
         Historial.objects.create(
             usuario=usuario,
-            mes=lista.fecha_creacion.strftime("%Y-%m"),
-            total=lista.presupuesto or 0,
+            mes=lista.fecha_creacion.strftime("%Y-%m"), # El mes de la lista
             numero_items=lista.items.count(),
-            promedio_por_categoria=0  # o algún cálculo si quieres
+            total=lista.presupuesto or 0,               # El presupuesto de esta lista
         )
         return Response(
             ListaSerializer(lista).data,
@@ -422,14 +425,6 @@ def recalcular_total(lista):
     total = sum(item.cantidad * item.precio_unitario for item in lista.items.all())
     lista.total_calculado = total
     lista.save()
-    usuario = lista.usuario
-    mes = lista.fecha_creacion.strftime("%Y-%m")
-    historial, created = Historial.objects.get_or_create(usuario=usuario, mes=mes)
-    historial.total = total
-    historial.numero_items = lista.items.count()
-    # promedio_por_categoria: calcula si quieres
-    historial.save()
-
 
 
 @api_view(["GET", "POST"])

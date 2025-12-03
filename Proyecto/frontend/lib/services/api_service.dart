@@ -51,6 +51,15 @@ class ApiService {
       'body': jsonDecode(response.body),
     };
   }
+  Future<Map<String, dynamic>> obtenerHistorial(int usuarioId) async {
+    final url = Uri.parse('$baseUrl/api/historial/$usuarioId/');
+    final response = await http.get(url);
+    return {
+      "status": response.statusCode,
+      "body": jsonDecode(response.body),
+    };
+  }
+
 
   /// ✅ Obtener listas de un usuario (soporta lista directa o objeto con "results"/"listas")
   Future<List<dynamic>> getListas(int usuarioId) async {
@@ -148,15 +157,6 @@ class ApiService {
 
     return [];
   }
-  Future<Map<String, dynamic>> obtenerHistorial(int usuarioId) async {
-    final url = Uri.parse('$baseUrl/api/historial/$usuarioId/');
-    final response = await http.get(url);
-    return {
-      "status": response.statusCode,
-      "body": jsonDecode(response.body),
-    };
-  }
-
 
   /// ITEMS
 

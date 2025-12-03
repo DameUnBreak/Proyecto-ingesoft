@@ -46,7 +46,7 @@ class _HistorialPageState extends State<HistorialPage> {
                   child: ListTile(
                     title: Text("Mes: ${h["mes"]}"),
                     subtitle: Text(
-                      "Total: ${h["total"]}\nItems: ${h["numero_items"]}",
+                      "Total: ${h["total"]}"
                     ),
                   ),
                 );
